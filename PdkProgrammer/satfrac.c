@@ -27,9 +27,9 @@ satfrac satfrac_add(satfrac a, satfrac b) {
 	}
 
 	if (SIGN_BYTE(a)) {
-		return INT16_MIN;
+		return SATFRAC_MIN;
 	} else {
-		return INT16_MAX;
+		return SATFRAC_MAX;
 	}
 }
 
@@ -47,9 +47,9 @@ satfrac satfrac_sub(satfrac a, satfrac b) {
 	}
 
 	if (SIGN_BYTE(a)) {
-		return INT16_MIN;
+		return SATFRAC_MIN;
 	} else {
-		return INT16_MAX;
+		return SATFRAC_MAX;
 	}
 }
 
