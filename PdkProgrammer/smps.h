@@ -11,11 +11,12 @@
 #include "satfrac.h"
 
 // Voltage divisor value
-#define SMPS_RATIO (680.0 / 68.0)
+#define SMPS_R1 680.0
+#define SMPS_R2 68.0
 #define SMPS_REF 1.1
 
 static inline satfrac smps_adc_target(float volts) {
-	return satfrac_from_float(volts / SMPS_RATIO / SMPS_REF);
+	return satfrac_from_float(volts * SMPS_R2 / (SMPS_R1 + SMPS_R2) / SMPS_REF);
 }
 
 void smps_init();
