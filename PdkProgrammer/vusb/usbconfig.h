@@ -26,6 +26,9 @@
 // Enable interrupt in for sending data.
 #define USB_CFG_HAVE_INTRIN_ENDPOINT 1
 
+// Enable write function
+#define USB_CFG_IMPLEMENT_FN_WRITE 1
+
 // Set poll speed to 10ms
 #define USB_CFG_INTR_POLL_INTERVAL 10
 
