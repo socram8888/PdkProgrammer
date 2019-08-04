@@ -11,9 +11,9 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
-#define SMPS_EN_DDR DDRD
-#define SMPS_EN_PORT PORTD
-#define SMPS_EN_BIT 4
+#define SMPS_EN_DDR DDRA
+#define SMPS_EN_PORT PORTA
+#define SMPS_EN_BIT 6
 
 static volatile satfrac smpsDuty;
 static volatile satfrac smpsAdcTarget;
@@ -21,20 +21,17 @@ static volatile satfrac smpsIntegral;
 static volatile satfrac smpsError;
 
 void smps_init() {
-	// Set timer 0 clock source to fcpu
-	TCCR0B = _BV(CS00);
-
 	// Set PWM pin as output
-	DDRD |= _BV(6);
+	DDRA |= _BV(7);
 
 	// Set SMPS enable pin as output
 	SMPS_EN_DDR |= _BV(SMPS_EN_BIT);
 
-	// Ref to internal reference and set mux to source 0
-	ADMUX = _BV(REFS1) | _BV(REFS0);
+	// Ref to internal reference and set mux to source 2
+	ADMUX = _BV(REFS1) | _BV(MUX1);
 
-	// Disable digital inputs in ADC0
-	DIDR0 = _BV(0);
+	// Disable digital inputs in ADC2
+	DIDR0 = _BV(2);
 }
 
 void smps_wait_target() {
@@ -51,11 +48,14 @@ void smps_on(satfrac adcTarget) {
 	// Enable SMPS
 	SMPS_EN_PORT &= ~_BV(SMPS_EN_BIT);
 
-	// Enable PWM on OC0A pin
-	TCCR0A = (TCCR0A & (_BV(COM0B1) | _BV(COM0B0))) | _BV(COM0A1) | _BV(WGM01) | _BV(WGM00);
+	// Enable PWM on OC0B pin
+	TCCR0A = _BV(COM0B1) | _BV(WGM01) | _BV(WGM00);
+
+	// Set timer 0 clock source to fcpu
+	TCCR0B = _BV(CS00);
 
 	// Start with smallest voltage and we'll scale
-	OCR0A = 0;
+	OCR0B = 0;
 	smpsDuty = 0;
 
 	// Enable ADC, start sampling, enable interrupts and set prescaler to 128
@@ -76,6 +76,9 @@ void smps_off() {
 	// Disable SMPS
 	SMPS_EN_PORT |= _BV(SMPS_EN_BIT);
 
+	// Disable PWM clock
+	TCCR0B = 0x00;
+
 	// Disable PWM pin
 	TCCR0A = 0x00;
 
@@ -85,11 +88,9 @@ void smps_off() {
 	ADCSRA = 0;
 }
 
-ISR(ADC_vect) {
-	// LED pin
-	DDRB |= _BV(5);
-	PORTB |= _BV(5);
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmispelled-isr"
+void __attribute__((signal)) smps_update() {
 	satfrac read = satfrac_from_int(ADCW, 1024);
 	satfrac error = satfrac_sub(smpsAdcTarget, read);
 	smpsError = error;
@@ -97,12 +98,21 @@ ISR(ADC_vect) {
 	smpsIntegral = satfrac_add(error, smpsIntegral);
 	
 	satfrac correction = satfrac_add(
-	satfrac_mul(error, satfrac_from_float(0.5)),
-	satfrac_mul(smpsIntegral, satfrac_from_float(1.0 / 256))
+		satfrac_mul(error, satfrac_from_float(0.5)),
+		satfrac_mul(smpsIntegral, satfrac_from_float(1.0 / 256))
 	);
 
 	smpsDuty = satfrac_add(smpsDuty, correction);
-	OCR0A = min((uint8_t) satfrac_to_int(smpsDuty, 256), 128);
+	OCR0B = min((uint8_t) satfrac_to_int(smpsDuty, 256), 128);
+}
+#pragma GCC diagnostic pop
 
-	ADCSRA |= _BV(ADSC);
+ISR(ADC_vect, ISR_NAKED) {
+	asm(
+		"sei\n" // Re-enable interrupts ASAP
+		"rcall smps_update\n" // Recalculate
+		"cli\n" // Disable interrupts before setting ADSC, so this does never fire before fully popping all data
+		"sbi 0x06, 6\n" // Set ADSC again
+		"reti\n"
+	);
 }

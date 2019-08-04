@@ -1,5 +1,6 @@
-Debug/
-Release/
+[Dd]ebug
+[Rr]elease
+.vs
 *.o
 *.hex
-.vs
+*.componentinfo.xml
