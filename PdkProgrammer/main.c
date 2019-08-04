@@ -9,7 +9,6 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
-#include "debug.h"
 #include "smps.h"
 
 int main(void) {
