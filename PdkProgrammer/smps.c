@@ -27,6 +27,9 @@ void smps_init() {
 	// Set SMPS enable pin as output
 	SMPS_EN_DDR |= _BV(SMPS_EN_BIT);
 
+	// Power off
+	SMPS_EN_DDR |= _BV(SMPS_EN_BIT);
+
 	// Ref to internal reference and set mux to source 2
 	ADMUX = _BV(REFS1) | _BV(MUX1);
 
