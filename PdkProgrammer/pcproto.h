@@ -19,20 +19,10 @@ enum {
 enum {
 	MODE_OFF = 0,
 	MODE_READ,
-	MODE_ERASE,
 	MODE_WRITE
 };
 
-struct request_mode {
-	uint8_t mode;
-};
-
 struct request_read {
-	uint16_t address;
-	uint8_t count;
-};
-
-struct request_erase {
 	uint16_t address;
 	uint8_t count;
 };
@@ -44,10 +34,19 @@ struct request_write {
 
 struct request {
 	union {
-		struct request_mode mode;
 		struct request_read read;
-		struct request_erase erase;
 		struct request_write write;
+	};
+};
+
+struct reply_mode {
+	uint8_t currentMode;
+	uint16_t devId;
+};
+
+struct reply {
+	union {
+		struct reply_mode mode;
 	};
 };
 

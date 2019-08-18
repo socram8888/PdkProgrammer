@@ -141,6 +141,12 @@
     <Compile Include="main.c">
       <SubType>compile</SubType>
     </Compile>
+    <Compile Include="pdkspi.c">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="pdkspi.h">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="vusb\oddebug.c">
       <SubType>compile</SubType>
     </Compile>

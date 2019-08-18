@@ -12,6 +12,7 @@
 #include "vusb/usbdrv.h"
 #include "smps.h"
 #include "pcproto.h"
+#include "pdkspi.h"
 
 uint8_t currentCommand = 0;
 uint8_t currentMode = MODE_OFF;
@@ -19,6 +20,8 @@ uint8_t currentMode = MODE_OFF;
 struct request request;
 uint8_t requestBytesPos;
 uint8_t requestBytesLen;
+
+struct reply reply;
 
 int main(void) {
 	// SMPS enable pin as output
@@ -49,6 +52,10 @@ int main(void) {
     }
 }
 
+#define SMPS_EN_DDR DDRA
+#define SMPS_EN_PORT PORTA
+#define SMPS_EN_BIT 6
+
 usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 	usbRequest_t* rq = (void*) data;
 
@@ -57,23 +64,38 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 	switch (rq->bRequest) {
 		case CMD_SET_MODE:
-			if (requestBytesLen == sizeof(struct request_mode)) {
-				currentCommand = CMD_SET_MODE;
-				return USB_NO_MSG;
+			// No data expected
+			if (requestBytesLen == 0) {
+				reply.mode.devId = 0;
+				if (currentMode != MODE_OFF) {
+					padauk_finish();
+					currentMode = MODE_OFF;
+				}
+
+				switch (rq->wValue.bytes[0]) {
+					case MODE_READ:
+						reply.mode.devId = padauk_start_read();
+						currentMode = MODE_READ;
+						break;
+					case MODE_WRITE:
+						reply.mode.devId = padauk_start_write();
+						currentMode = MODE_WRITE;
+						break;
+				}
+
+				reply.mode.currentMode = currentMode;
+				usbMsgPtr = (uint8_t *) &reply;
+				return sizeof(reply.mode);
 			}
 			break;
+
 		case CMD_READ:
 			if (requestBytesLen == sizeof(struct request_read)) {
 				currentCommand = CMD_READ;
 				return USB_NO_MSG;
 			}
 			break;
-		case CMD_ERASE:
-			if (requestBytesLen == sizeof(struct request_erase)) {
-				currentCommand = CMD_ERASE;
-				return USB_NO_MSG;
-			}
-			break;
+
 		case CMD_WRITE:
 			if (
 				requestBytesLen >= 4 && // At least one word to write
