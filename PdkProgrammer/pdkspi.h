@@ -12,14 +12,11 @@
 #include <stdint.h>
 
 void padauk_init();
+uint16_t padauk_start(uint8_t cmd);
 
-uint16_t padauk_start_read();
 uint16_t padauk_flash_read(uint16_t addr);
-
-uint16_t padauk_start_write();
 void padauk_flash_write(uint16_t addr, const uint16_t * data);
-
-uint16_t padauk_erase();
+void padauk_flash_erase();
 
 void padauk_finish();
 

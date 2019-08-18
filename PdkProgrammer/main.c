@@ -15,17 +15,15 @@
 #include "pdkspi.h"
 
 uint8_t currentCommand = 0;
-uint8_t currentMode = MODE_OFF;
+uint16_t devId = 0;
 
 struct request request;
 uint8_t requestBytesPos;
 uint8_t requestBytesLen;
 
-struct reply reply;
-
 int main(void) {
 	// SMPS enable pin as output
-	//smps_init();
+	smps_init();
 
 	// Initialize USB
 	usbInit();
@@ -63,29 +61,15 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 	requestBytesLen = (uint8_t) rq->wLength.word;
 
 	switch (rq->bRequest) {
-		case CMD_SET_MODE:
+		case CMD_START:
 			// No data expected
 			if (requestBytesLen == 0) {
-				reply.mode.devId = 0;
-				if (currentMode != MODE_OFF) {
+				if (devId != 0) {
 					padauk_finish();
-					currentMode = MODE_OFF;
 				}
-
-				switch (rq->wValue.bytes[0]) {
-					case MODE_READ:
-						reply.mode.devId = padauk_start_read();
-						currentMode = MODE_READ;
-						break;
-					case MODE_WRITE:
-						reply.mode.devId = padauk_start_write();
-						currentMode = MODE_WRITE;
-						break;
-				}
-
-				reply.mode.currentMode = currentMode;
-				usbMsgPtr = (uint8_t *) &reply;
-				return sizeof(reply.mode);
+				devId = padauk_start(rq->wValue.bytes[0]);
+				usbMsgPtr = (uint8_t *) &devId;
+				return sizeof(devId);
 			}
 			break;
 
@@ -122,6 +106,5 @@ USB_PUBLIC uchar usbFunctionWrite(uchar * data, usbMsgLen_t len) {
 		return 0;
 	}
 
-	_delay_ms(1000);
 	return 1;
 }

@@ -10,16 +10,11 @@
 #define PCPROTO_H_
 
 enum {
-	CMD_SET_MODE = 1,
+	CMD_START = 1,
 	CMD_READ,
+	CMD_WRITE,
 	CMD_ERASE,
-	CMD_WRITE
-};
-
-enum {
-	MODE_OFF = 0,
-	MODE_READ,
-	MODE_WRITE
+	CMD_END,
 };
 
 struct request_read {
@@ -36,17 +31,6 @@ struct request {
 	union {
 		struct request_read read;
 		struct request_write write;
-	};
-};
-
-struct reply_mode {
-	uint8_t currentMode;
-	uint16_t devId;
-};
-
-struct reply {
-	union {
-		struct reply_mode mode;
 	};
 };
 

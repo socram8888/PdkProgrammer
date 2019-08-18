@@ -103,19 +103,6 @@ uint16_t padauk_spi_read(uint8_t bits) {
 	return data;
 }
 
-void padauk_begin(satfrac volts) {
-	smps_on(volts);
-	_delay_us(100);
-
-	VDD33_PORT |= _BV(VDD33_BIT);
-	_delay_us(500);
-}
-
-void padauk_finish() {
-	VDD33_PORT &= ~_BV(VDD33_BIT);
-	smps_off();
-}
-
 uint16_t padauk_command(uint8_t cmd) {
 	padauk_spi_write( 0xA5A, 12);
 	padauk_spi_write(0x5A5A, 16);
@@ -135,9 +122,23 @@ uint16_t padauk_command(uint8_t cmd) {
 	return ack;
 }
 
-uint16_t padauk_start_read() {
-	padauk_begin(satfrac_from_float(PROG_VOLT));
-	return padauk_command(6);
+uint16_t padauk_start(uint8_t cmd) {
+	smps_on(satfrac_from_float(PROG_VOLT));
+	_delay_us(100);
+
+	VDD33_PORT |= _BV(VDD33_BIT);
+	_delay_us(500);
+
+	uint16_t devId = padauk_command(cmd);
+	if (devId == 0) {
+		padauk_finish();
+	}
+	return devId;
+}
+
+void padauk_finish() {
+	VDD33_PORT &= ~_BV(VDD33_BIT);
+	smps_off();
 }
 
 uint16_t padauk_flash_read(uint16_t addr) {
@@ -147,11 +148,6 @@ uint16_t padauk_flash_read(uint16_t addr) {
 	padauk_spi_output();
 	padauk_spi_clock();
 	return data;
-}
-
-uint16_t padauk_start_write() {
-	padauk_begin(satfrac_from_float(PROG_VOLT));
-	return padauk_command(7);
 }
 
 void padauk_flash_write(uint16_t addr, const uint16_t * data) {
