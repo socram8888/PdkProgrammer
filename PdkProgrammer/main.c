@@ -60,9 +60,9 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
 					requestBytesLen == 0
 			) {
-				//if (devId != 0) {
+				if (devId != 0) {
 					padauk_finish();
-				//}
+				}
 			}
 			break;
 

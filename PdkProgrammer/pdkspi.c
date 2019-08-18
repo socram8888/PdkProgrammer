@@ -16,7 +16,7 @@
 #define ERASE_VOLT 6.5
 
 // Base delay of 1us
-#define BASEDELAY 1000
+#define BASEDELAY 2
 
 // PA3 in PFS154 is clock. This is connected to AVR PA4
 #define CLOCK_PORT PORTA
@@ -25,6 +25,7 @@
 
 // PA6 in PFS154 is data. This is connected to AVR PA5
 #define DATA_PORT PORTA
+#define DATA_PIN PINA
 #define DATA_DDR DDRA
 #define DATA_BIT 5
 
@@ -92,7 +93,10 @@ void padauk_spi_write(uint16_t data, uint8_t bits) {
 uint8_t padauk_spi_read_bit() {
 	CLOCK_PORT |= _BV(CLOCK_BIT);
 	_delay_us(BASEDELAY);
-	uint8_t val = DATA_PORT & _BV(DATA_BIT);
+	uint8_t val = 0;
+	if (DATA_PIN & _BV(DATA_BIT)) {
+		val = 1;
+	}
 	CLOCK_PORT &= ~_BV(CLOCK_BIT);
 	_delay_us(BASEDELAY);
 	return val;
