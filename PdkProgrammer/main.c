@@ -25,6 +25,9 @@ int main(void) {
 	// SMPS enable pin as output
 	smps_init();
 
+	// Init Padauk pins
+	padauk_init();
+
 	// Initialize USB
 	usbInit();
 
@@ -36,34 +39,39 @@ int main(void) {
 	sei();
 
     /* Replace with your application code */
-    while (1) 
-    {
-		/*
-		smps_on(smps_adc_target(5.8));
-		_delay_ms(1000);
-		smps_switch(smps_adc_target(6.2));
-		_delay_ms(1000);
-		smps_off();
-		_delay_ms(1000);
-		*/
+    while (1) {
 		usbPoll();
     }
 }
 
-#define SMPS_EN_DDR DDRA
-#define SMPS_EN_PORT PORTA
-#define SMPS_EN_BIT 6
-
 usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 	usbRequest_t* rq = (void*) data;
+
+	if ((rq->bmRequestType & USBRQ_TYPE_MASK) != USBRQ_TYPE_VENDOR) {
+		return 0;
+	}
 
 	requestBytesPos = 0;
 	requestBytesLen = (uint8_t) rq->wLength.word;
 
 	switch (rq->bRequest) {
+		case CMD_END:
+			if (
+					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
+					requestBytesLen == 0
+			) {
+				//if (devId != 0) {
+					padauk_finish();
+				//}
+			}
+			break;
+
 		case CMD_START:
 			// No data expected
-			if (requestBytesLen == 0) {
+			if (
+					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
+					requestBytesLen == 2
+			) {
 				if (devId != 0) {
 					padauk_finish();
 				}

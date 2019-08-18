@@ -12,11 +12,11 @@
 #include "smps.h"
 
 // Voltages
-#define PROG_VOLT 5.8
+#define PROG_VOLT 6
 #define ERASE_VOLT 6.5
 
 // Base delay of 1us
-#define BASEDELAY 1
+#define BASEDELAY 1000
 
 // PA3 in PFS154 is clock. This is connected to AVR PA4
 #define CLOCK_PORT PORTA
@@ -39,14 +39,18 @@
 #define VDDSMPS_BIT 1
 
 void padauk_init() {
-	// Disconnect VDD33 to VDD
+	// Disconnect VDD33 to VDD (active low)
 	VDD33_DDR |= _BV(VDD33_BIT);
-	
+	VDD33_PORT |= _BV(VDD33_BIT);
+
 	// Disconnect SMPS to VDD
 	VDDSMPS_DDR |= _BV(VDDSMPS_BIT);
 
 	// Set clock as output
 	CLOCK_DDR |= _BV(CLOCK_BIT);
+
+	// Data by default as output too
+	DATA_DDR |= _BV(DATA_BIT);
 }
 
 void padauk_spi_clock() {
@@ -123,10 +127,10 @@ uint16_t padauk_command(uint8_t cmd) {
 }
 
 uint16_t padauk_start(uint8_t cmd) {
-	smps_on(satfrac_from_float(PROG_VOLT));
+	smps_on(smps_adc_target(PROG_VOLT));
 	_delay_us(100);
 
-	VDD33_PORT |= _BV(VDD33_BIT);
+	VDD33_PORT &= ~_BV(VDD33_BIT);
 	_delay_us(500);
 
 	uint16_t devId = padauk_command(cmd);
@@ -137,7 +141,7 @@ uint16_t padauk_start(uint8_t cmd) {
 }
 
 void padauk_finish() {
-	VDD33_PORT &= ~_BV(VDD33_BIT);
+	VDD33_PORT |= _BV(VDD33_BIT);
 	smps_off();
 }
 

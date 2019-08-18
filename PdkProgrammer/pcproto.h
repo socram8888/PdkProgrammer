@@ -10,11 +10,11 @@
 #define PCPROTO_H_
 
 enum {
-	CMD_START = 1,
+	CMD_END = 0,
+	CMD_START,
 	CMD_READ,
 	CMD_WRITE,
 	CMD_ERASE,
-	CMD_END,
 };
 
 struct request_read {
