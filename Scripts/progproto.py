@@ -62,8 +62,10 @@ class Programmer:
 		self._mode = ProtoModes.READ
 
 	def read(self, offset, length, timeout=500):
-		words = array.array('H')
+		if self._mode is not ProtoModes.READ:
+			raise Exception("Not in read mode")
 
+		words = array.array('H')
 		while length > 0:
 			iterlen = min(length, Programmer.MAX_WORDS)
 			iterdata = self._dev.controlRead(LIBUSB_REQUEST_TYPE_VENDOR, ProtoCommands.READ, 0, offset, iterlen * 2, timeout)
@@ -76,6 +78,46 @@ class Programmer:
 			length -= iterlen
 
 		return words
+
+	def start_write(self, timeout=100):
+		rx = self._dev.controlRead(LIBUSB_REQUEST_TYPE_VENDOR, ProtoCommands.MODE, ProtoModes.WRITE, 0, 2, timeout)
+		devId, = struct.unpack("<H", rx)
+
+		if devId != 0xAA1:
+			raise Exception("Unsupported device ID: %06X" % devId)
+
+		self._mode = ProtoModes.WRITE
+
+	def write(self, offset, words, timeout=500):
+		if self._mode != ProtoModes.WRITE:
+			raise Exception("Not in write mode")
+
+		if len(words) % 4 != 0:
+			raise Exception("Words must be programmed in chunks of 4")
+
+		bytes = words.tobytes()
+		while len(bytes) > 0:
+			iterlen = min(len(bytes), Programmer.MAX_WORDS * 2)
+			iterdata = bytes[0:iterlen]
+			written = self._dev.controlWrite(LIBUSB_REQUEST_TYPE_VENDOR, ProtoCommands.WRITE, 0, offset, iterdata, timeout)
+
+			if written != iterlen:
+				raise Exception("Expected to write %d bytes, wrote %d" % (iterlen, written))
+
+			bytes = bytes[iterlen:]
+
+	def erase(self, timeout=500):
+		rx = self._dev.controlRead(LIBUSB_REQUEST_TYPE_VENDOR, ProtoCommands.MODE, ProtoModes.ERASE, 0, 2, timeout)
+		devId, = struct.unpack("<H", rx)
+
+		if devId != 0xAA1:
+			raise Exception("Unsupported device ID: %06X" % devId)
+
+		rx = self._dev.controlRead(LIBUSB_REQUEST_TYPE_VENDOR, ProtoCommands.ERASE, 0, 0, 2, timeout)
+		devIdErase, = struct.unpack("<H", rx)
+
+		if devIdErase != devId:
+			raise Exception("Erase failed (expected reply %06X, got %06X)" % (devId, devIdErase))
 
 	def finish(self):
 		if self._mode != ProtoModes.OFF:

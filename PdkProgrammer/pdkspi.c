@@ -5,6 +5,7 @@
  *  Author: Marcos
  */ 
 
+#include <avr/interrupt.h>
 #include <avr/io.h>
 #include <util/delay.h>
 #include "pdkspi.h"
@@ -13,7 +14,7 @@
 
 // Voltages
 #define PROG_VOLT 6
-#define ERASE_VOLT 6.5
+#define ERASE_VOLT 7.2
 
 // Base delay of 1us
 #define BASEDELAY 2
@@ -29,12 +30,12 @@
 #define DATA_DDR DDRA
 #define DATA_BIT 5
 
-// VDD33 enable is AVR PA0
+// VDD33 enable is AVR PA0 (active low)
 #define VDD33_PORT PORTA
 #define VDD33_DDR DDRA
 #define VDD33_BIT 0
 
-// VDDSMPS enable is AVR PA1
+// VDDSMPS enable is AVR PA1 (active high)
 #define VDDSMPS_PORT PORTA
 #define VDDSMPS_DDR DDRA
 #define VDDSMPS_BIT 1
@@ -146,10 +147,11 @@ uint16_t padauk_start(uint8_t cmd) {
 
 void padauk_finish() {
 	VDD33_PORT |= _BV(VDD33_BIT);
+	VDDSMPS_PORT &= ~_BV(VDDSMPS_BIT);
 	smps_off();
 }
 
-uint16_t padauk_flash_read(uint16_t addr) {
+uint16_t padauk_read(uint16_t addr) {
 	padauk_spi_write(addr, 13);
 	padauk_spi_input();
 	uint16_t data = padauk_spi_read(14);
@@ -158,11 +160,36 @@ uint16_t padauk_flash_read(uint16_t addr) {
 	return data;
 }
 
-void padauk_flash_write(uint16_t addr, const uint16_t * data) {
+void padauk_write_setup() {
+	// Gotta switch fast
+	cli();
+	VDD33_PORT |= _BV(VDD33_BIT);
+	VDDSMPS_PORT |= _BV(VDDSMPS_BIT);
+	sei();
+}
+
+void padauk_write(uint16_t addr, const uint16_t * data) {
 	padauk_spi_write(data[0], 14);
 	padauk_spi_write(data[1], 14);
 	padauk_spi_write(data[2], 14);
 	padauk_spi_write(data[3], 14);
 	padauk_spi_write(addr, 13);
 	padauk_spi_write(0, 9);
+}
+
+void padauk_erase() {
+	smps_switch(smps_adc_target(ERASE_VOLT));
+	_delay_ms(10);
+	CLOCK_PORT |= _BV(CLOCK_BIT);
+	_delay_ms(5);
+	CLOCK_PORT &= ~_BV(CLOCK_BIT);
+	CLOCK_PORT |= _BV(CLOCK_BIT);
+	CLOCK_PORT &= ~_BV(CLOCK_BIT);
+	CLOCK_PORT |= _BV(CLOCK_BIT);
+	_delay_ms(5);
+	CLOCK_PORT &= ~_BV(CLOCK_BIT);
+	CLOCK_PORT |= _BV(CLOCK_BIT);
+	CLOCK_PORT &= ~_BV(CLOCK_BIT);
+	_delay_us(150);
+	padauk_finish();
 }

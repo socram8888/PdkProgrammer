@@ -20,6 +20,9 @@ uint8_t currentMode = MODE_OFF;
 uint8_t requestBytesPos;
 uint8_t requestBytesLen;
 
+uint8_t writeSetup;
+uint16_t writeOffset;
+
 union {
 	uint16_t wordBuffer[127];
 	uint16_t devId;
@@ -68,6 +71,8 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 				}
 
 				iobuf.devId = 0;
+				writeSetup = 0;
+
 				switch (rq->wValue.bytes[0]) {
 					case MODE_READ:
 						iobuf.devId = padauk_start(0x06);
@@ -92,6 +97,10 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 			break;
 
 		case CMD_READ:
+			if ((rq->bmRequestType & USBRQ_DIR_MASK) != USBRQ_DIR_DEVICE_TO_HOST) {
+				return 0;
+			}
+
 			if (rq->wLength.word > sizeof(iobuf.wordBuffer)) {
 				requestBytesLen = sizeof(iobuf.wordBuffer);
 			} else {
@@ -105,7 +114,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 				}
 			} else {
 				for (uint8_t offset = 0; offset < requestBytesLen / 2; offset++) {
-					iobuf.wordBuffer[offset] = padauk_flash_read(rq->wIndex.word + offset);
+					iobuf.wordBuffer[offset] = padauk_read(rq->wIndex.word + offset);
 				}
 			}
 
@@ -114,22 +123,37 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 
 		case CMD_WRITE:
 			if (
-				requestBytesLen >= 4 && // At least one word to write
-				requestBytesLen % 2 == 1 && // Only pairs of bytes
-				requestBytesLen < sizeof(iobuf.wordBuffer) // Do not exceed buffer size
+					currentMode == MODE_WRITE && // Write mode
+					rq->wLength.word % 8 == 0 && // Blocks of 4 words
+					rq->wLength.word < sizeof(iobuf.wordBuffer) // Do not exceed buffer size
 			) {
 				currentCommand = CMD_WRITE;
+				requestBytesPos = 0;
+				requestBytesLen = rq->wLength.word;
+				writeOffset = rq->wIndex.word;
 				return USB_NO_MSG;
 			}
 			break;
+
+		case CMD_ERASE:
+			if (
+					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
+					currentMode == MODE_ERASE && // Erase mode
+					rq->wLength.word == 2 // We have to send something, so we'll send the device ID
+			) {
+				padauk_erase();
+				currentMode = MODE_OFF;
+
+				usbMsgPtr = (uint8_t *) &iobuf.devId;
+				return sizeof(iobuf.devId);
+			}
 	}
 
 	return 0;
 }
 
 USB_PUBLIC uchar usbFunctionWrite(uchar * data, usbMsgLen_t len) {
-	/*
-	uint8_t * requestBytes = (uint8_t *) &request;
+	uint8_t * requestBytes = (uint8_t *) &iobuf.wordBuffer;
 	for (uint8_t i = 0; i < len; i++) {
 		requestBytes[requestBytesPos + i] = data[i];
 	}
@@ -138,6 +162,15 @@ USB_PUBLIC uchar usbFunctionWrite(uchar * data, usbMsgLen_t len) {
 	if (requestBytesPos < requestBytesLen) {
 		return 0;
 	}
-*/
+
+	if (!writeSetup) {
+		padauk_write_setup();
+		writeSetup = 1;
+	}
+
+	for (uint8_t word = 0; word < requestBytesLen / 8; word += 4) {
+		padauk_write(writeOffset + word, iobuf.wordBuffer + word);
+	}
+
 	return 1;
 }

@@ -14,9 +14,11 @@
 void padauk_init();
 uint16_t padauk_start(uint8_t cmd);
 
-uint16_t padauk_flash_read(uint16_t addr);
-void padauk_flash_write(uint16_t addr, const uint16_t * data);
-void padauk_flash_erase();
+uint16_t padauk_read(uint16_t addr);
+
+void padauk_write_setup();
+void padauk_write(uint16_t addr, const uint16_t * data);
+void padauk_erase();
 
 void padauk_finish();
 
