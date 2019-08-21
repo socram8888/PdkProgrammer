@@ -4,3 +4,4 @@
 *.o
 *.hex
 *.componentinfo.xml
+__pycache__

@@ -10,28 +10,17 @@
 #define PCPROTO_H_
 
 enum {
-	CMD_END = 0,
-	CMD_START,
+	CMD_MODE = 0,
 	CMD_READ,
 	CMD_WRITE,
-	CMD_ERASE,
+	CMD_ERASE
 };
 
-struct request_read {
-	uint16_t address;
-	uint8_t count;
-};
-
-struct request_write {
-	uint16_t address;
-	uint16_t data[32];
-};
-
-struct request {
-	union {
-		struct request_read read;
-		struct request_write write;
-	};
+enum {
+	MODE_OFF = 0,
+	MODE_READ,
+	MODE_WRITE,
+	MODE_ERASE
 };
 
 #endif /* PCPROTO_H_ */

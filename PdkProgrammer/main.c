@@ -15,11 +15,15 @@
 #include "pdkspi.h"
 
 uint8_t currentCommand = 0;
-uint16_t devId = 0;
+uint8_t currentMode = MODE_OFF;
 
-struct request request;
 uint8_t requestBytesPos;
 uint8_t requestBytesLen;
+
+union {
+	uint16_t wordBuffer[127];
+	uint16_t devId;
+} iobuf;
 
 int main(void) {
 	// SMPS enable pin as output
@@ -51,48 +55,68 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 		return 0;
 	}
 
-	requestBytesPos = 0;
-	requestBytesLen = (uint8_t) rq->wLength.word;
-
 	switch (rq->bRequest) {
-		case CMD_END:
-			if (
-					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
-					requestBytesLen == 0
-			) {
-				if (devId != 0) {
-					padauk_finish();
-				}
-			}
-			break;
-
-		case CMD_START:
+		case CMD_MODE:
 			// No data expected
 			if (
 					(rq->bmRequestType & USBRQ_DIR_MASK) == USBRQ_DIR_DEVICE_TO_HOST &&
-					requestBytesLen == 2
+					rq->wLength.word >= 2
 			) {
-				if (devId != 0) {
+				if (currentMode != MODE_OFF) {
 					padauk_finish();
+					currentMode = MODE_OFF;
 				}
-				devId = padauk_start(rq->wValue.bytes[0]);
-				usbMsgPtr = (uint8_t *) &devId;
-				return sizeof(devId);
+
+				iobuf.devId = 0;
+				switch (rq->wValue.bytes[0]) {
+					case MODE_READ:
+						iobuf.devId = padauk_start(0x06);
+						break;
+
+					case MODE_WRITE:
+						iobuf.devId = padauk_start(0x07);
+						break;
+
+					case MODE_ERASE:
+						iobuf.devId = padauk_start(0x03);
+						break;
+				}
+
+				if (iobuf.devId != 0x0000) {
+					currentMode = rq->wValue.bytes[0];
+				}
+
+				usbMsgPtr = (uint8_t *) &iobuf.devId;
+				return sizeof(iobuf.devId);
 			}
 			break;
 
 		case CMD_READ:
-			if (requestBytesLen == sizeof(struct request_read)) {
-				currentCommand = CMD_READ;
-				return USB_NO_MSG;
+			if (rq->wLength.word > sizeof(iobuf.wordBuffer)) {
+				requestBytesLen = sizeof(iobuf.wordBuffer);
+			} else {
+				// Round to nearest word
+				requestBytesLen = (uint8_t) rq->wLength.word & 0xFE;
 			}
-			break;
+
+			if (currentMode != MODE_READ) {
+				for (uint8_t offset = 0; offset < requestBytesLen / 2; offset++) {
+					iobuf.wordBuffer[offset] = 0xDEAD;
+				}
+			} else {
+				for (uint8_t offset = 0; offset < requestBytesLen / 2; offset++) {
+					iobuf.wordBuffer[offset] = padauk_flash_read(rq->wIndex.word + offset);
+				}
+			}
+
+			usbMsgPtr = (uint8_t *) iobuf.wordBuffer;
+			return requestBytesLen;
 
 		case CMD_WRITE:
 			if (
 				requestBytesLen >= 4 && // At least one word to write
 				requestBytesLen % 2 == 1 && // Only pairs of bytes
-				requestBytesLen < sizeof(struct request_write) // Do not exceed buffer size
+				requestBytesLen < sizeof(iobuf.wordBuffer) // Do not exceed buffer size
 			) {
 				currentCommand = CMD_WRITE;
 				return USB_NO_MSG;
@@ -104,6 +128,7 @@ usbMsgLen_t usbFunctionSetup(uchar data[8]) {
 }
 
 USB_PUBLIC uchar usbFunctionWrite(uchar * data, usbMsgLen_t len) {
+	/*
 	uint8_t * requestBytes = (uint8_t *) &request;
 	for (uint8_t i = 0; i < len; i++) {
 		requestBytes[requestBytesPos + i] = data[i];
@@ -113,6 +138,6 @@ USB_PUBLIC uchar usbFunctionWrite(uchar * data, usbMsgLen_t len) {
 	if (requestBytesPos < requestBytesLen) {
 		return 0;
 	}
-
+*/
 	return 1;
 }
